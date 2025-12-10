@@ -4,13 +4,17 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import re
+import matplotlib.font_manager as fm
 from statsmodels.tsa.api import SimpleExpSmoothing
 from statsmodels.tsa.seasonal import seasonal_decompose
 
-# --- 1. ตั้งค่าฟอนต์ภาษาไทย ---
+if os.path.exists('THSarabunNew.ttf'):
+    fm.fontManager.addfont('THSarabunNew.ttf')
+    prop = fm.FontProperties(fname='THSarabunNew.ttf')
+    mpl.rc('font', family=prop.get_name())
+
 mpl.rc('font', family='Tahoma', size=11)
 
-# --- 2. ฟังก์ชันโหลดและแปลงข้อมูล ---
 @st.cache_data(show_spinner=False)
 def load_data_transposed():
     file_name = 'ตาราง 59-67.xlsx'
@@ -22,26 +26,23 @@ def load_data_transposed():
     except Exception as e:
         return None, str(e)
 
-    # --- Data Cleaning ---
     try:
         first_col = df.columns[0]
-        # ลบแถวว่าง
+
         df = df.dropna(subset=[first_col])
-        # แปลงชื่อแถวเป็นตัวหนังสือให้หมด (ตัดช่องว่างซ้ายขวาออกด้วย)
+
         df[first_col] = df[first_col].astype(str).str.strip()
         
-        # ตั้ง Index
+
         df.set_index(first_col, inplace=True)
         
-        # 🔥 แก้ปัญหาชื่อซ้ำ (Duplicate Fix) 🔥
-        # ถ้าเจอชื่อซ้ำ (เช่น 'รวม' มา 2 รอบ) ให้เอาเฉพาะอันแรกสุดที่เจอ (keep='first')
-        # เพื่อป้องกัน Error: Duplicate column names
+
         df = df[~df.index.duplicated(keep='first')]
         
-        # กลับหัวตาราง (Transpose)
+
         df_t = df.T 
         
-        # ล้างชื่อปี (Clean Year Name)
+
         new_index = []
         for idx in df_t.index:
             match = re.search(r'\d{4}', str(idx))
@@ -53,11 +54,10 @@ def load_data_transposed():
         df_t.index = new_index
         df_t.index.name = 'Year'
 
-        # แปลงค่าข้างในเป็นตัวเลข (อะไรไม่ใช่ตัวเลขเปลี่ยนเป็น 0)
+
         df_t = df_t.apply(pd.to_numeric, errors='coerce').fillna(0)
 
-        # สร้างคอลัมน์รวมยอด (Grand Total) ขึ้นมาใหม่เอง (ชัวร์กว่าไปเชื่อใน Excel)
-        # ตั้งชื่อให้ไม่ซ้ำกับคำว่า "รวม" ใน Excel
+
         df_t['ยอดรวมทุกประเภท (Grand Total)'] = df_t.sum(axis=1)
 
         return df_t, None
@@ -65,7 +65,7 @@ def load_data_transposed():
     except Exception as e:
         return None, f"ข้อมูลผิดพลาด: {e}"
 
-# --- 3. ส่วนแสดงผล ---
+
 st.set_page_config(page_title="Accident Analytics", layout="wide")
 st.title("📊 ระบบวิเคราะห์สถิติแบบเจาะลึก")
 
@@ -75,13 +75,13 @@ if error_msg:
     st.error(f"❌ เกิดข้อผิดพลาด: {error_msg}")
 
 elif df_data is not None:
-    # --- Sidebar ---
+
     st.sidebar.header("🔍 1. เลือกหมวดหมู่")
     
-    # ดึงรายชื่อคอลัมน์
+
     categories = list(df_data.columns)
     
-    # จัดลำดับ: เอา 'ยอดรวมทุกประเภท' มาไว้บนสุด
+
     target_col = 'ยอดรวมทุกประเภท (Grand Total)'
     if target_col in categories:
         categories.remove(target_col)
@@ -101,20 +101,20 @@ elif df_data is not None:
          "Decomposition (แยกองค์ประกอบ)"]
     )
 
-    # --- Main Content ---
+
     st.subheader(f"ผลการวิเคราะห์: {selected_category}")
     
-    # ดึงข้อมูลมาเป็น Series
+
     series_data = df_data[selected_category]
 
     col1, col2 = st.columns([1, 2])
 
     with col1:
         st.markdown("### 📄 ตารางข้อมูล")
-        # แสดงตาราง
+
         st.dataframe(series_data, height=400, use_container_width=True)
         
-        # สรุปสถิติ
+
         total = series_data.sum()
         avg = series_data.mean()
         max_v = series_data.max()
@@ -130,10 +130,10 @@ elif df_data is not None:
         st.markdown(f"### 📉 กราฟ: {graph_type}")
         fig, ax = plt.subplots(figsize=(10, 6))
         
-        # สีเส้นกราฟ
+
         main_color = '#c0392b' if selected_category == 'ยอดรวมทุกประเภท (Grand Total)' else '#2980b9'
 
-        # --- Logic กราฟ ---
+
         if graph_type == "Time Series (กราฟเส้นปกติ)":
             ax.plot(series_data.index, series_data.values, marker='o', linewidth=2, color=main_color, label='ข้อมูลจริง')
             ax.fill_between(series_data.index, series_data.values, color=main_color, alpha=0.1)
@@ -192,19 +192,17 @@ elif df_data is not None:
         
         st.pyplot(fig)
 
-    # --- Bar Chart ---
+
     st.markdown("---")
     st.subheader("📊 เปรียบเทียบสัดส่วน (ปีล่าสุด)")
     
     latest_year = df_data.index[-1]
-    # กรองเอา Grand Total ออก
+
     df_compare = df_data.loc[latest_year].drop('ยอดรวมทุกประเภท (Grand Total)', errors='ignore')
-    
-    # แปลง index เป็น string และกรองค่าแปลกๆ ออก
+
     df_compare.index = df_compare.index.astype(str)
     df_compare = df_compare[df_compare.index != 'nan']
     
-    # ลบพวกแถวที่เป็น 'รวม' หรือ 'Total' ที่อาจหลุดรอดมาจาก Excel (ถ้ามี)
     df_compare = df_compare[~df_compare.index.str.contains('รวม|Total', case=False, na=False)]
     
     df_compare = df_compare.sort_values(ascending=False)
@@ -221,4 +219,5 @@ elif df_data is not None:
                             xy=(bar.get_x() + bar.get_width() / 2, height),
                             xytext=(0, 3), textcoords="offset points",
                             ha='center', va='bottom')
+
         st.pyplot(fig_bar)
