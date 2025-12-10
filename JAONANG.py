@@ -1,20 +1,25 @@
-﻿import streamlit as st
+import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
+import matplotlib.font_manager as fm
 import re
-import os                                 # <--- เติมบรรทัดนี้ครับ!
-import matplotlib.font_manager as fm      # <--- และบรรทัดนี้ (ถ้ายังไม่มี)
+import os
 from statsmodels.tsa.api import SimpleExpSmoothing
 from statsmodels.tsa.seasonal import seasonal_decompose
 
-if os.path.exists('THSarabunNew.ttf'):
-    fm.fontManager.addfont('THSarabunNew.ttf')
-    prop = fm.FontProperties(fname='THSarabunNew.ttf')
-    mpl.rc('font', family=prop.get_name())
+font_file = 'THSarabunNew.ttf'
 
-mpl.rc('font', family='Tahoma', size=11)
+if os.path.exists(font_file):
+    fm.fontManager.addfont(font_file)
+    prop = fm.FontProperties(fname=font_file)
+    plt.rcParams['font.family'] = prop.get_name()
+    plt.rcParams['font.size'] = 14
+    mpl.rc('font', family=prop.get_name())
+else:
+    plt.rcParams['font.family'] = 'Tahoma'
+    mpl.rc('font', family='Tahoma', size=11)
 
 @st.cache_data(show_spinner=False)
 def load_data_transposed():
@@ -29,21 +34,14 @@ def load_data_transposed():
 
     try:
         first_col = df.columns[0]
-
         df = df.dropna(subset=[first_col])
-
         df[first_col] = df[first_col].astype(str).str.strip()
         
-
         df.set_index(first_col, inplace=True)
-        
-
         df = df[~df.index.duplicated(keep='first')]
         
-
         df_t = df.T 
         
-
         new_index = []
         for idx in df_t.index:
             match = re.search(r'\d{4}', str(idx))
@@ -55,17 +53,13 @@ def load_data_transposed():
         df_t.index = new_index
         df_t.index.name = 'Year'
 
-
         df_t = df_t.apply(pd.to_numeric, errors='coerce').fillna(0)
-
-
         df_t['ยอดรวมทุกประเภท (Grand Total)'] = df_t.sum(axis=1)
 
         return df_t, None
 
     except Exception as e:
-        return None, f"ข้อมูลผิดพลาด: {e}"
-
+        return None, f"Error: {e}"
 
 st.set_page_config(page_title="Accident Analytics", layout="wide")
 st.title("📊 ระบบวิเคราะห์สถิติแบบเจาะลึก")
@@ -73,17 +67,15 @@ st.title("📊 ระบบวิเคราะห์สถิติแบบ�
 df_data, error_msg = load_data_transposed()
 
 if error_msg:
-    st.error(f"❌ เกิดข้อผิดพลาด: {error_msg}")
+    st.error(f"❌ Error: {error_msg}")
 
 elif df_data is not None:
 
     st.sidebar.header("🔍 1. เลือกหมวดหมู่")
     
-
     categories = list(df_data.columns)
-    
-
     target_col = 'ยอดรวมทุกประเภท (Grand Total)'
+    
     if target_col in categories:
         categories.remove(target_col)
         categories.insert(0, target_col)
@@ -102,20 +94,15 @@ elif df_data is not None:
          "Decomposition (แยกองค์ประกอบ)"]
     )
 
-
     st.subheader(f"ผลการวิเคราะห์: {selected_category}")
-    
-
     series_data = df_data[selected_category]
 
     col1, col2 = st.columns([1, 2])
 
     with col1:
         st.markdown("### 📄 ตารางข้อมูล")
-
         st.dataframe(series_data, height=400, use_container_width=True)
         
-
         total = series_data.sum()
         avg = series_data.mean()
         max_v = series_data.max()
@@ -131,15 +118,13 @@ elif df_data is not None:
         st.markdown(f"### 📉 กราฟ: {graph_type}")
         fig, ax = plt.subplots(figsize=(10, 6))
         
-
         main_color = '#c0392b' if selected_category == 'ยอดรวมทุกประเภท (Grand Total)' else '#2980b9'
-
 
         if graph_type == "Time Series (กราฟเส้นปกติ)":
             ax.plot(series_data.index, series_data.values, marker='o', linewidth=2, color=main_color, label='ข้อมูลจริง')
             ax.fill_between(series_data.index, series_data.values, color=main_color, alpha=0.1)
             for x, y in zip(series_data.index, series_data.values):
-                ax.annotate(f'{y:,.0f}', (x, y), textcoords="offset points", xytext=(0,10), ha='center', fontsize=9)
+                ax.annotate(f'{y:,.0f}', (x, y), textcoords="offset points", xytext=(0,10), ha='center', fontsize=12)
             ax.legend()
 
         elif graph_type == "Trend Analysis (เส้นแนวโน้ม)":
@@ -193,19 +178,15 @@ elif df_data is not None:
         
         st.pyplot(fig)
 
-
     st.markdown("---")
     st.subheader("📊 เปรียบเทียบสัดส่วน (ปีล่าสุด)")
     
     latest_year = df_data.index[-1]
-
     df_compare = df_data.loc[latest_year].drop('ยอดรวมทุกประเภท (Grand Total)', errors='ignore')
-
+    
     df_compare.index = df_compare.index.astype(str)
     df_compare = df_compare[df_compare.index != 'nan']
-    
     df_compare = df_compare[~df_compare.index.str.contains('รวม|Total', case=False, na=False)]
-    
     df_compare = df_compare.sort_values(ascending=False)
 
     if not df_compare.empty:
@@ -219,7 +200,6 @@ elif df_data is not None:
             ax_bar.annotate(f'{height:,.0f}',
                             xy=(bar.get_x() + bar.get_width() / 2, height),
                             xytext=(0, 3), textcoords="offset points",
-                            ha='center', va='bottom')
+                            ha='center', va='bottom', fontsize=11)
 
         st.pyplot(fig_bar)
-
