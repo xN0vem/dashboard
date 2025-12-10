@@ -4,7 +4,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import re
-import matplotlib.font_manager as fm
+import os                                 # <--- เติมบรรทัดนี้ครับ!
+import matplotlib.font_manager as fm      # <--- และบรรทัดนี้ (ถ้ายังไม่มี)
 from statsmodels.tsa.api import SimpleExpSmoothing
 from statsmodels.tsa.seasonal import seasonal_decompose
 
@@ -221,3 +222,4 @@ elif df_data is not None:
                             ha='center', va='bottom')
 
         st.pyplot(fig_bar)
+
